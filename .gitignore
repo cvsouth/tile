@@ -1,5 +1,4 @@
 .idea
-./tile
-*.tiles.pdf
-README.pdf
+/tile
+*.pdf
 .tile.json

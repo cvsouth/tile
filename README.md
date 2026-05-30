@@ -3,6 +3,10 @@
 Turn any image into a multi-page, tile-and-glue PDF poster. Print every page,
 glue them on their overlaps, and you get one large reproduction of the original.
 
+[![Test](https://github.com/cvsouth/tile/actions/workflows/test.yml/badge.svg)](https://github.com/cvsouth/tile/actions/workflows/test.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/cvsouth/tile)](https://goreportcard.com/report/github.com/cvsouth/tile)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/cvsouth/tile/badge)](https://scorecard.dev/viewer/?uri=github.com/cvsouth/tile)
+
 Borderless (full-bleed) printing is assumed: every page is full paper size and
 neighbouring tiles overlap by the glue overlap.
 

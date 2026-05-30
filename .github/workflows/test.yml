@@ -1,0 +1,116 @@
+name: tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# Declare default permissions as read only
+permissions: read-all
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      with:
+        persist-credentials: false
+
+    - name: Set up Go
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+      with:
+        go-version-file: 'go.mod'
+
+    - name: Cache Go modules
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+        fail-on-cache-miss: false
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Check LICENSE file exists
+      run: |
+        if [ ! -f LICENSE ] && [ ! -f COPYING ] && [ ! -f COPYRIGHT ]; then
+          echo "No LICENSE file found"
+          exit 1
+        fi
+
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@82606bf257cbaff209d206a39f5134f0cfbfd2ee # v9.2.1
+      with:
+        version: v2.11.4
+
+    - name: Install govulncheck
+      run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+
+    - name: Run govulncheck
+      run: govulncheck ./...
+
+    - name: Check gofmt
+      run: |
+        UNFORMATTED=$(gofmt -l .)
+        if [ -n "$UNFORMATTED" ]; then
+          echo "FAIL: The following files are not gofmt'd:"
+          echo "$UNFORMATTED"
+          exit 1
+        fi
+        echo "gofmt: PASS"
+
+    - name: Check gocyclo
+      run: |
+        go install github.com/fzipp/gocyclo/cmd/gocyclo@v0.6.0
+        OUTPUT=$(gocyclo -over 15 . 2>&1) || true
+        if [ -n "$OUTPUT" ]; then
+          echo "FAIL: Functions with cyclomatic complexity > 15:"
+          echo "$OUTPUT"
+          exit 1
+        fi
+        echo "gocyclo: PASS"
+
+    - name: Check ineffassign
+      run: |
+        go install github.com/gordonklaus/ineffassign@v0.2.0
+        ineffassign ./...
+        echo "ineffassign: PASS"
+
+    - name: Check misspell
+      run: |
+        go install github.com/client9/misspell/cmd/misspell@v0.3.4
+        OUTPUT=$(misspell .)
+        if [ -n "$OUTPUT" ]; then
+          echo "FAIL: Misspellings found:"
+          echo "$OUTPUT"
+          exit 1
+        fi
+        echo "misspell: PASS"
+
+    - name: Run tests with coverage
+      run: go test -coverprofile=coverage.out -covermode=atomic ./...
+
+    - name: Check coverage
+      run: |
+        # Filter out cmd/ from coverage
+        grep -v 'cmd/' coverage.out > coverage_filtered.out
+
+        # Calculate and display coverage
+        COVERAGE=$(go tool cover -func=coverage_filtered.out | grep total | awk '{print $3}' | sed 's/%//')
+        echo "Total coverage: ${COVERAGE}%"
+
+        # Enforce minimum 50% coverage
+        if [ "$(echo "$COVERAGE < 50" | bc)" -eq 1 ]; then
+          echo ""
+          echo "FAIL: Coverage is ${COVERAGE}%, required minimum 50%"
+          exit 1
+        fi
+        echo ""
+        echo "SUCCESS: Coverage is ${COVERAGE}% (minimum 50%)"

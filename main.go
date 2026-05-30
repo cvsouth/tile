@@ -25,6 +25,9 @@ import (
 
 const settingsFile = ".tile.json"
 
+// Version is the build version, injected at release time via -ldflags.
+var Version = "dev"
+
 func main() {
 	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, "tile: "+err.Error())
@@ -39,7 +42,7 @@ func run(args []string) error {
 
 	fs := flag.NewFlagSet("tile", flag.ContinueOnError)
 	fs.Usage = func() {
-		const usage = `tile — image tile for multi-page tile-and-glue prints
+		const usage = `tile — multi-page tile-and-glue poster generator
 
 Usage:
   tile [options] <image.(jpg|jpeg|png|svg)>
@@ -64,9 +67,14 @@ Options:
 	labels := fs.String("labels", onOff(base.Labels), "alignment labels in the overlap band: on or off")
 	output := fs.String("output", "", "output PDF path (default: <image>.tiles.pdf)")
 	nonInteractive := fs.Bool("non-interactive", false, "generate immediately without the TUI")
+	showVersion := fs.Bool("version", false, "print version and exit")
 
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *showVersion {
+		fmt.Println("tile " + Version)
+		return nil
 	}
 
 	imagePath := fs.Arg(0)
@@ -79,65 +87,82 @@ Options:
 	}
 
 	o := base
-	var err error
-	if o.Paper, err = tile.ParsePaper(*paper); err != nil {
+	o.OverlapMM, o.WidthCM, o.RenderDPI, o.Output = *overlap, *width, *dpi, *output
+	if err := parseEnums(&o, *paper, *brushing, *pasting, *labels); err != nil {
 		return err
 	}
-	if o.Brushing, err = tile.ParseBrushing(*brushing); err != nil {
-		return err
-	}
-	if o.Pasting, err = tile.ParsePasting(*pasting); err != nil {
-		return err
-	}
-	if o.Labels, err = tile.ParseToggle(*labels); err != nil {
-		return err
-	}
-	o.OverlapMM = *overlap
-	o.WidthCM = *width
-	o.RenderDPI = *dpi
-	o.Output = *output
 
 	src, err := source.Load(imagePath, o.RenderDPI)
 	if err != nil {
 		return err
 	}
+	if err := dpiOnlyForVector(fs, src); err != nil {
+		return err
+	}
 
-	// --dpi only applies to vector (SVG) sources.
-	dpiSet := false
+	used, generated, err := produce(o, src, imagePath, !*nonInteractive)
+	if err != nil {
+		return err
+	}
+	if !generated {
+		return nil // user quit without generating: nothing to save or report
+	}
+	return finish(cwd, used, src)
+}
+
+// parseEnums fills the enum-valued options from their string flags.
+func parseEnums(o *tile.Options, paper, brushing, pasting, labels string) error {
+	var err error
+	if o.Paper, err = tile.ParsePaper(paper); err != nil {
+		return err
+	}
+	if o.Brushing, err = tile.ParseBrushing(brushing); err != nil {
+		return err
+	}
+	if o.Pasting, err = tile.ParsePasting(pasting); err != nil {
+		return err
+	}
+	o.Labels, err = tile.ParseToggle(labels)
+	return err
+}
+
+// dpiOnlyForVector rejects an explicit --dpi for raster sources.
+func dpiOnlyForVector(fs *flag.FlagSet, src source.Source) error {
+	set := false
 	fs.Visit(func(fl *flag.Flag) {
 		if fl.Name == "dpi" {
-			dpiSet = true
+			set = true
 		}
 	})
-	if dpiSet && !src.Info().IsVector {
+	if set && !src.Info().IsVector {
 		return fmt.Errorf("--dpi only applies to vector (SVG) inputs")
 	}
+	return nil
+}
 
-	if *nonInteractive {
-		if o.Output == "" {
-			o.Output = tile.DefaultOutputName(imagePath)
-		}
-		layout, err := tile.ComputeLayout(o, src.Info())
-		if err != nil {
-			return err
-		}
-		if err := render.Generate(layout, src, o, o.Output); err != nil {
-			return err
-		}
-	} else {
-		used, generated, err := tui.Run(imagePath, src, o)
-		if err != nil {
-			return err
-		}
-		if !generated {
-			return nil // user quit without generating: nothing to save or report
-		}
-		o = used
+// produce generates the PDF, either through the interactive TUI or directly.
+// It returns the options actually used and whether a PDF was produced.
+func produce(o tile.Options, src source.Source, imagePath string, interactive bool) (tile.Options, bool, error) {
+	if interactive {
+		return tui.Run(imagePath, src, o)
 	}
+	if o.Output == "" {
+		o.Output = tile.DefaultOutputName(imagePath)
+	}
+	l, err := tile.ComputeLayout(o, src.Info())
+	if err != nil {
+		return o, false, err
+	}
+	if err := render.Generate(l, src, o, o.Output); err != nil {
+		return o, false, err
+	}
+	return o, true, nil
+}
 
-	// Persist the used settings as this directory's defaults, and print them so
-	// the run stays in the terminal history for reference.
-	layout, err := tile.ComputeLayout(o, src.Info())
+// finish persists the used settings as this directory's defaults and prints
+// them so the run stays in the terminal history for reference.
+func finish(cwd string, o tile.Options, src source.Source) error {
+	l, err := tile.ComputeLayout(o, src.Info())
 	if err != nil {
 		return err
 	}
@@ -147,7 +172,7 @@ Options:
 	} else {
 		saved = path
 	}
-	printRun(o, layout, saved)
+	printRun(o, l, saved)
 	return nil
 }
 
