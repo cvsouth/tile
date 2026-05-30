@@ -100,7 +100,7 @@ type Options struct {
 // DefaultOptions returns the documented defaults.
 func DefaultOptions() Options {
 	return Options{
-		Paper:     A4,
+		Paper:     A3,
 		OverlapMM: 15,  // 1.5 cm
 		WidthCM:   123, // cm
 		Brushing:  Downwards,

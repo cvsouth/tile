@@ -80,14 +80,15 @@ type Model struct {
 	layout    tiler.Layout
 	layoutErr error
 
-	state      state
-	resultPath string
-	genErr     error
+	state  state
+	genErr error
+
+	generated bool          // a PDF was produced this session
+	used      tiler.Options // the options that produced it
 }
 
 type genResultMsg struct {
-	path string
-	err  error
+	err error
 }
 
 // New builds the form, seeded with defaults (CLI flags may have changed them).
@@ -214,11 +215,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			m.state = failed
 			m.genErr = msg.err
-		} else {
-			m.state = done
-			m.resultPath = msg.path
+			return m, nil
 		}
-		return m, nil
+		// Success: record what was used and exit immediately (no keypress).
+		// The caller prints the settings + result to the terminal.
+		m.state = done
+		m.generated = true
+		return m, tea.Quit
 
 	case tea.KeyMsg:
 		return m.handleKey(msg)
@@ -325,6 +328,7 @@ func (m Model) submit() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.layout, m.layoutErr = l, nil
+	m.used = o
 	m.state = generating
 	return m, generateCmd(l, m.src, o)
 }
@@ -336,13 +340,19 @@ func generateCmd(l tiler.Layout, src source.Source, o tiler.Options) tea.Cmd {
 			s.SetRenderDPI(o.RenderDPI)
 		}
 		err := render.Generate(l, src, o, o.Output)
-		return genResultMsg{path: o.Output, err: err}
+		return genResultMsg{err: err}
 	}
 }
 
-// Run launches the interactive TUI.
-func Run(inputPath string, src source.Source, def tiler.Options) error {
-	p := tea.NewProgram(New(inputPath, src, def))
-	_, err := p.Run()
-	return err
+// Run launches the interactive TUI. It returns the options that were used to
+// generate (valid only when generated is true) so the caller can persist and
+// report them. The alt-screen keeps the form off the scrollback, leaving only
+// the caller's printed summary behind.
+func Run(inputPath string, src source.Source, def tiler.Options) (used tiler.Options, generated bool, err error) {
+	fm, err := tea.NewProgram(New(inputPath, src, def), tea.WithAltScreen()).Run()
+	if err != nil {
+		return def, false, err
+	}
+	m := fm.(Model)
+	return m.used, m.generated, nil
 }

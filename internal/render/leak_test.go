@@ -45,7 +45,7 @@ func TestLabelInkNeverLeaksBand(t *testing.T) {
 				if !plan.draw {
 					continue // skipped rather than leaked — acceptable
 				}
-				g := labelGeometry(strip, plan, margin)
+				g := labelGeometry(strip, plan)
 				x0, y0, x1, y1 := g.bbox[0], g.bbox[1], g.bbox[2], g.bbox[3]
 				if x0 < bx0-eps || y0 < by0-eps || x1 > bx1+eps || y1 > by1+eps {
 					t.Errorf("LEAK %s ov=%g label=%q: ink bbox [%.3f,%.3f,%.3f,%.3f] outside band [%.3f,%.3f,%.3f,%.3f]",

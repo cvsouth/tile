@@ -20,17 +20,17 @@ func mustLayout(t *testing.T, o Options, info ImageInfo) Layout {
 
 func TestDefaultsChooseLandscape(t *testing.T) {
 	o := DefaultOptions()
-	// 123 cm wide, square-ish image.
+	// 123 cm wide, square-ish image. Default paper is A3.
 	l := mustLayout(t, o, raster(0.75, 4000, 3000))
 	if l.Orientation != Landscape {
 		t.Errorf("expected landscape, got %s", l.Orientation)
 	}
-	// posterW = 1230mm; landscape A4 step = 297-15 = 282; cols = ceil((1230-15)/282)=ceil(4.31)=5
-	if l.Cols != 5 {
-		t.Errorf("cols = %d, want 5", l.Cols)
+	// posterW = 1230mm; landscape A3 step = 420-15 = 405; cols = ceil((1230-15)/405)=ceil(3.0)=3
+	if l.Cols != 3 {
+		t.Errorf("cols = %d, want 3", l.Cols)
 	}
-	if l.PaperW != 297 || l.PaperH != 210 {
-		t.Errorf("paper = %gx%g, want 297x210", l.PaperW, l.PaperH)
+	if l.PaperW != 420 || l.PaperH != 297 {
+		t.Errorf("paper = %gx%g, want 420x297", l.PaperW, l.PaperH)
 	}
 }
 

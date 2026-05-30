@@ -17,7 +17,6 @@ var (
 	dimStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
 	headingStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("117"))
 	errStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("203"))
-	okStyle      = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("78"))
 	warnStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
 	cursorStyle  = focusStyle.SetString("› ")
 	blankCursor  = lipgloss.NewStyle().SetString("  ")
@@ -32,9 +31,9 @@ func (m Model) View() string {
 		return "\n  " + headingStyle.Render("Generating ") +
 			fmt.Sprintf("%d pages → %s …\n", m.layout.TotalPages(), m.resultName()) + "\n"
 	case done:
-		return "\n  " + okStyle.Render("✓ Wrote ") +
-			fmt.Sprintf("%d pages to %s\n", m.layout.TotalPages(), m.resultPath) +
-			"  " + dimStyle.Render("Press any key to exit.") + "\n"
+		// Generation succeeded; the program is exiting. The caller prints the
+		// settings + result to the terminal, so render nothing here.
+		return ""
 	case failed:
 		return "\n  " + errStyle.Render("✗ "+m.genErr.Error()) + "\n  " +
 			dimStyle.Render("esc to edit · q to quit") + "\n"

@@ -11,12 +11,13 @@ import (
 
 const minLabelPt = 3.0 // below this the label is illegibly small; skip it rather than leak
 
-// Labels are drawn as a light casing under dark ink (a halo) so they read
-// against any background — light, dark, or mid-tone — instead of vanishing.
-var (
-	darkInk  = [3]int{20, 20, 20}
-	lightInk = [3]int{248, 248, 248}
-	haloDirs = [8][2]float64{{-1, -1}, {0, -1}, {1, -1}, {-1, 0}, {1, 0}, {-1, 1}, {0, 1}, {1, 1}}
+// Opacities for the in-band marks. They sit in the hidden overlap band, so they
+// are kept faint; the black+white construction keeps them readable on any
+// background even at low opacity.
+const (
+	guideAlpha       = 0.3  // alternating white/black dashed seam guides
+	labelAlpha       = 0.6  // label on a covered (hidden) band
+	cornerLabelAlpha = 0.35 // the one tile with no band: its label may show, so fainter
 )
 
 // hostStrip is the rectangle (page mm) a tile's label is drawn inside. It is
@@ -56,24 +57,23 @@ func chooseHostStrip(b tiler.Bands, brush tiler.Brushing, paste tiler.Pasting, p
 	}
 }
 
-// labelPlan is the fitted size of a label, including the halo allowance, sized so
-// the whole block fits within its host strip. draw is false when no legible size
-// fits (the label is then skipped rather than allowed to leak).
+// labelPlan is the fitted size of a label. The label is printed twice — a white
+// copy and a black copy, side by side — so whichever colour contrasts with the
+// background stays readable. The two copies plus the gap between them must fit
+// the strip; draw is false when no legible size fits (then it is skipped rather
+// than allowed to leak past a covered edge).
 type labelPlan struct {
 	draw    bool
 	rotated bool
 	fontPt  float64
 	textW   float64
 	capMM   float64
-	halo    float64
-	arrow   bool
-	arrowW  float64
+	gap     float64
 }
 
-// planLabel fits the label (plus halo, plus an optional arrow on horizontal
-// bands) to the strip, shrinking the font until the whole block fits within the
-// strip's interior. The block is centred when drawn, so fitting guarantees
-// containment.
+// planLabel shrinks the font until both copies (along the strip's long axis) and
+// the cap height (across it) fit the strip interior. The block is centred when
+// drawn, so fitting guarantees containment.
 func planLabel(pdf *fpdf.Fpdf, s hostStrip, label string, margin float64) labelPlan {
 	lengthAvail, thickAvail := s.w-2*margin, s.h-2*margin
 	if s.vertical {
@@ -88,27 +88,14 @@ func planLabel(pdf *fpdf.Fpdf, s hostStrip, label string, margin float64) labelP
 		pdf.SetFont("Helvetica", "", f)
 		emMM := f / 72.0 * 25.4
 		capMM := emMM * 0.7
-		halo := math.Max(0.12, emMM*0.08)
 		textW := pdf.GetStringWidth(label)
+		gap := capMM * 0.8
 
-		arrow, arrowW := false, 0.0
-		if !s.vertical {
-			aw := capMM * 0.9
-			if aw+margin+textW+2*halo <= lengthAvail {
-				arrow, arrowW = true, aw
-			}
+		blockLen := 2*textW + gap
+		if blockLen <= lengthAvail && capMM <= thickAvail {
+			return labelPlan{draw: true, rotated: s.vertical, fontPt: f, textW: textW, capMM: capMM, gap: gap}
 		}
-		gap := 0.0
-		if arrow {
-			gap = margin
-		}
-		blockLen := arrowW + gap + textW + 2*halo
-		blockThick := capMM + 2*halo
-
-		if blockLen <= lengthAvail && blockThick <= thickAvail {
-			return labelPlan{draw: true, rotated: s.vertical, fontPt: f, textW: textW, capMM: capMM, halo: halo, arrow: arrow, arrowW: arrowW}
-		}
-		r := math.Min(lengthAvail/blockLen, thickAvail/blockThick)
+		r := math.Min(lengthAvail/blockLen, thickAvail/capMM)
 		nf := f * r
 		if nf >= f {
 			nf = f * 0.9
@@ -121,57 +108,43 @@ func planLabel(pdf *fpdf.Fpdf, s hostStrip, label string, margin float64) labelP
 	return labelPlan{}
 }
 
-// labelGeom is the resolved on-page placement of a label (centred in its strip),
-// including the union ink bounding box (x0,y0,x1,y1 in page mm) used to prove the
-// label cannot leak past a covered edge.
+// labelGeom is the resolved on-page placement (centred in the strip): the start
+// x of each copy, the shared baseline, and the ink bounding box (page mm) used
+// to prove the label stays within its covered band.
 type labelGeom struct {
-	rotated         bool
-	cx, cy          float64
-	textX, baseline float64
-	arrow           bool
-	arrowCx         float64
-	bbox            [4]float64
+	rotated                  bool
+	cx, cy                   float64
+	whiteX, blackX, baseline float64
+	bbox                     [4]float64
 }
 
-func labelGeometry(s hostStrip, p labelPlan, margin float64) labelGeom {
+func labelGeometry(s hostStrip, p labelPlan) labelGeom {
 	g := labelGeom{rotated: p.rotated, cx: s.x + s.w/2, cy: s.y + s.h/2}
-	if p.rotated {
-		hx := p.capMM/2 + p.halo
-		hy := p.textW/2 + p.halo
-		g.bbox = [4]float64{g.cx - hx, g.cy - hy, g.cx + hx, g.cy + hy}
-		return g
-	}
-	gap := 0.0
-	if p.arrow {
-		gap = margin
-	}
-	blockLen := p.arrowW + gap + p.textW
-	leftEdge := g.cx - blockLen/2
-	if p.arrow {
-		g.arrow = true
-		g.arrowCx = leftEdge + p.arrowW/2
-		g.textX = leftEdge + p.arrowW + gap
-	} else {
-		g.textX = leftEdge
-	}
+	blockLen := 2*p.textW + p.gap
+	// Local layout (length axis horizontal): both copies on one baseline, centred.
+	g.whiteX = g.cx - blockLen/2
+	g.blackX = g.whiteX + p.textW + p.gap
 	g.baseline = g.cy + p.capMM/2
-	g.bbox = [4]float64{leftEdge - p.halo, g.cy - p.capMM/2 - p.halo, leftEdge + blockLen + p.halo, g.cy + p.capMM/2 + p.halo}
+	if p.rotated {
+		// Rotating 90° swaps the axes: length runs down the page, cap across it.
+		g.bbox = [4]float64{g.cx - p.capMM/2, g.cy - blockLen/2, g.cx + p.capMM/2, g.cy + blockLen/2}
+	} else {
+		g.bbox = [4]float64{g.cx - blockLen/2, g.cy - p.capMM/2, g.cx + blockLen/2, g.cy + p.capMM/2}
+	}
 	return g
 }
 
-// drawLabel draws the haloed alignment label, an up arrow (poster-top) on
-// horizontal bands, and the seam guide lines, all inside the hidden overlap
-// band(s) and legible against any background.
+// drawLabel draws the alignment label (a white copy beside a black copy, so it
+// reads on any background) and the seam guide lines, all inside the hidden
+// overlap band(s).
 func drawLabel(pdf *fpdf.Fpdf, l tiler.Layout, o tiler.Options, tile tiler.Tile) {
 	overlap := l.Overlap
 	margin := math.Min(overlap*0.15, 1.0)
 
-	// Seam guide lines (haloed dashed): where each covering neighbour's edge lands.
-	guideCore := math.Max(0.15, overlap*0.025)
-	pdf.SetAlpha(0.9, "Normal")
-	pdf.SetDashPattern([]float64{1.2, 1.2}, 0)
-	drawGuides(pdf, l, tile.Bands, guideCore)
-	pdf.SetDashPattern([]float64{}, 0)
+	// Seam guide lines: where each covering neighbour's edge lands. Drawn as
+	// dashes that alternate white and black, so at least one colour always
+	// contrasts with the background.
+	drawGuides(pdf, l, tile.Bands, math.Max(0.15, overlap*0.02))
 
 	strip := chooseHostStrip(tile.Bands, o.Brushing, o.Pasting, l.PaperW, l.PaperH, overlap)
 	label := fmt.Sprintf("R%dC%d", tile.Row+1, tile.Col+1)
@@ -181,76 +154,62 @@ func drawLabel(pdf *fpdf.Fpdf, l tiler.Layout, o tiler.Options, tile tiler.Tile)
 		return
 	}
 
-	alpha := 0.95
+	alpha := labelAlpha
 	if !strip.covered {
-		alpha = 0.55 // the one unavoidably-visible corner: a touch softer
+		alpha = cornerLabelAlpha // the one unavoidably-visible corner: a touch softer
 	}
 	pdf.SetAlpha(alpha, "Normal")
 	pdf.SetFont("Helvetica", "", plan.fontPt)
 
-	g := labelGeometry(strip, plan, margin)
+	g := labelGeometry(strip, plan)
 	if g.rotated {
 		pdf.TransformBegin()
 		pdf.TransformRotate(90, g.cx, g.cy)
-		drawHaloText(pdf, g.cx-plan.textW/2, g.cy+plan.capMM/2, label, plan.halo)
+		drawTwoTone(pdf, g.whiteX, g.blackX, g.baseline, label)
 		pdf.TransformEnd()
 	} else {
-		if g.arrow {
-			drawHaloArrow(pdf, g.arrowCx, g.cy, plan.arrowW, plan.capMM, math.Max(0.1, plan.capMM*0.12), plan.halo)
-		}
-		drawHaloText(pdf, g.textX, g.baseline, label, plan.halo)
+		drawTwoTone(pdf, g.whiteX, g.blackX, g.baseline, label)
 	}
 	pdf.SetAlpha(1, "Normal")
 }
 
-func drawGuides(pdf *fpdf.Fpdf, l tiler.Layout, b tiler.Bands, core float64) {
+// drawTwoTone prints the label in white, then again in black just beside it.
+func drawTwoTone(pdf *fpdf.Fpdf, whiteX, blackX, baseline float64, label string) {
+	pdf.SetTextColor(255, 255, 255)
+	pdf.Text(whiteX, baseline, label)
+	pdf.SetTextColor(0, 0, 0)
+	pdf.Text(blackX, baseline, label)
+}
+
+func drawGuides(pdf *fpdf.Fpdf, l tiler.Layout, b tiler.Bands, lineW float64) {
 	if b.Top {
-		drawHaloLine(pdf, 0, l.Overlap, l.PaperW, l.Overlap, core)
+		drawAltLine(pdf, 0, l.Overlap, l.PaperW, l.Overlap, lineW)
 	}
 	if b.Bottom {
-		drawHaloLine(pdf, 0, l.PaperH-l.Overlap, l.PaperW, l.PaperH-l.Overlap, core)
+		drawAltLine(pdf, 0, l.PaperH-l.Overlap, l.PaperW, l.PaperH-l.Overlap, lineW)
 	}
 	if b.Left {
-		drawHaloLine(pdf, l.Overlap, 0, l.Overlap, l.PaperH, core)
+		drawAltLine(pdf, l.Overlap, 0, l.Overlap, l.PaperH, lineW)
 	}
 	if b.Right {
-		drawHaloLine(pdf, l.PaperW-l.Overlap, 0, l.PaperW-l.Overlap, l.PaperH, core)
+		drawAltLine(pdf, l.PaperW-l.Overlap, 0, l.PaperW-l.Overlap, l.PaperH, lineW)
 	}
 }
 
-func drawHaloLine(pdf *fpdf.Fpdf, x1, y1, x2, y2, core float64) {
-	setDraw(pdf, lightInk)
-	pdf.SetLineWidth(core * 3)
+// drawAltLine draws a thin guide line whose dashes alternate white and black,
+// each at low opacity. The two colours fall on different segments, so whichever
+// contrasts with the background shows through — the line is visible on light,
+// dark and mid-tone backgrounds alike, with no halo and a single line width.
+func drawAltLine(pdf *fpdf.Fpdf, x1, y1, x2, y2, lineW float64) {
+	const dash = 1.5
+	pdf.SetAlpha(guideAlpha, "Normal")
+	pdf.SetLineWidth(lineW)
+	pdf.SetDrawColor(255, 255, 255)
+	pdf.SetDashPattern([]float64{dash, dash}, 0)
 	pdf.Line(x1, y1, x2, y2)
-	setDraw(pdf, darkInk)
-	pdf.SetLineWidth(core)
+	pdf.SetDrawColor(0, 0, 0)
+	pdf.SetDashPattern([]float64{dash, dash}, dash) // phase into the gap => fills white's off-segments
 	pdf.Line(x1, y1, x2, y2)
+	pdf.SetDashPattern([]float64{}, 0)
+	pdf.SetAlpha(1, "Normal")
 }
-
-func drawHaloText(pdf *fpdf.Fpdf, x, baseline float64, s string, halo float64) {
-	setText(pdf, lightInk)
-	for _, d := range haloDirs {
-		pdf.Text(x+d[0]*halo, baseline+d[1]*halo, s)
-	}
-	setText(pdf, darkInk)
-	pdf.Text(x, baseline, s)
-}
-
-func drawHaloArrow(pdf *fpdf.Fpdf, cx, cy, w, h, core, halo float64) {
-	setDraw(pdf, lightInk)
-	pdf.SetLineWidth(core + 2*halo)
-	arrowLines(pdf, cx, cy, w, h)
-	setDraw(pdf, darkInk)
-	pdf.SetLineWidth(core)
-	arrowLines(pdf, cx, cy, w, h)
-}
-
-func arrowLines(pdf *fpdf.Fpdf, cx, cy, w, h float64) {
-	top, bot := cy-h/2, cy+h/2
-	pdf.Line(cx, bot, cx, top)
-	pdf.Line(cx, top, cx-w/2, top+h*0.35)
-	pdf.Line(cx, top, cx+w/2, top+h*0.35)
-}
-
-func setDraw(pdf *fpdf.Fpdf, c [3]int) { pdf.SetDrawColor(c[0], c[1], c[2]) }
-func setText(pdf *fpdf.Fpdf, c [3]int) { pdf.SetTextColor(c[0], c[1], c[2]) }

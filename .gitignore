@@ -2,3 +2,4 @@
 ./tiler
 *.tiles.pdf
 README.pdf
+.tile.json
