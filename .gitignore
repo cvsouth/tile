@@ -1,4 +1,4 @@
 .idea
-tiler
+./tiler
 *.tiles.pdf
 README.pdf
