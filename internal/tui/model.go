@@ -10,9 +10,9 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"tiler/internal/render"
-	"tiler/internal/source"
-	"tiler/internal/tiler"
+	"tile/internal/render"
+	"tile/internal/source"
+	"tile/internal/tile"
 )
 
 type state int
@@ -67,24 +67,24 @@ func fieldToInput(f field) int {
 type Model struct {
 	inputPath string
 	src       source.Source
-	info      tiler.ImageInfo
+	info      tile.ImageInfo
 
-	paper    tiler.Paper
-	brushing tiler.Brushing
-	pasting  tiler.Pasting
+	paper    tile.Paper
+	brushing tile.Brushing
+	pasting  tile.Pasting
 	labels   bool
 
 	inputs [tiCount]textinput.Model
 	focus  field
 
-	layout    tiler.Layout
+	layout    tile.Layout
 	layoutErr error
 
 	state  state
 	genErr error
 
-	generated bool          // a PDF was produced this session
-	used      tiler.Options // the options that produced it
+	generated bool         // a PDF was produced this session
+	used      tile.Options // the options that produced it
 }
 
 type genResultMsg struct {
@@ -92,7 +92,7 @@ type genResultMsg struct {
 }
 
 // New builds the form, seeded with defaults (CLI flags may have changed them).
-func New(inputPath string, src source.Source, def tiler.Options) Model {
+func New(inputPath string, src source.Source, def tile.Options) Model {
 	mk := func(val string, limit int) textinput.Model {
 		ti := textinput.New()
 		ti.SetValue(val)
@@ -103,7 +103,7 @@ func New(inputPath string, src source.Source, def tiler.Options) Model {
 	}
 	out := def.Output
 	if strings.TrimSpace(out) == "" {
-		out = tiler.DefaultOutputName(inputPath)
+		out = tile.DefaultOutputName(inputPath)
 	}
 	m := Model{
 		inputPath: inputPath,
@@ -131,8 +131,8 @@ func trimFloat(f float64) string {
 
 // options reads the current form into an Options, returning a parse error if a
 // numeric field is not a valid number.
-func (m Model) options() (tiler.Options, error) {
-	o := tiler.Options{Paper: m.paper, Brushing: m.brushing, Pasting: m.pasting, Labels: m.labels}
+func (m Model) options() (tile.Options, error) {
+	o := tile.Options{Paper: m.paper, Brushing: m.brushing, Pasting: m.pasting, Labels: m.labels}
 	parse := func(slot int, name string) (float64, error) {
 		v := strings.TrimSpace(m.inputs[slot].Value())
 		f, err := strconv.ParseFloat(v, 64)
@@ -153,7 +153,7 @@ func (m Model) options() (tiler.Options, error) {
 	}
 	out := strings.TrimSpace(m.inputs[tiOutput].Value())
 	if out == "" {
-		out = tiler.DefaultOutputName(m.inputPath)
+		out = tile.DefaultOutputName(m.inputPath)
 	}
 	o.Output = out
 	return o, nil
@@ -165,7 +165,7 @@ func (m *Model) recompute() {
 		m.layoutErr = err
 		return
 	}
-	l, err := tiler.ComputeLayout(o, m.info)
+	l, err := tile.ComputeLayout(o, m.info)
 	m.layout, m.layoutErr = l, err
 }
 
@@ -293,22 +293,22 @@ func (m *Model) toggle(key string) {
 	forward := key == "right" || key == "l" || key == " "
 	switch m.focus {
 	case fPaper:
-		if m.paper == tiler.A4 {
-			m.paper = tiler.A3
+		if m.paper == tile.A4 {
+			m.paper = tile.A3
 		} else {
-			m.paper = tiler.A4
+			m.paper = tile.A4
 		}
 	case fBrushing:
-		if m.brushing == tiler.Downwards {
-			m.brushing = tiler.Upwards
+		if m.brushing == tile.Downwards {
+			m.brushing = tile.Upwards
 		} else {
-			m.brushing = tiler.Downwards
+			m.brushing = tile.Downwards
 		}
 	case fPasting:
-		if m.pasting == tiler.FromLeft {
-			m.pasting = tiler.FromRight
+		if m.pasting == tile.FromLeft {
+			m.pasting = tile.FromRight
 		} else {
-			m.pasting = tiler.FromLeft
+			m.pasting = tile.FromLeft
 		}
 	case fLabels:
 		m.labels = !m.labels
@@ -322,7 +322,7 @@ func (m Model) submit() (tea.Model, tea.Cmd) {
 		m.layoutErr = err
 		return m, nil
 	}
-	l, err := tiler.ComputeLayout(o, m.info)
+	l, err := tile.ComputeLayout(o, m.info)
 	if err != nil {
 		m.layoutErr = err
 		return m, nil
@@ -333,7 +333,7 @@ func (m Model) submit() (tea.Model, tea.Cmd) {
 	return m, generateCmd(l, m.src, o)
 }
 
-func generateCmd(l tiler.Layout, src source.Source, o tiler.Options) tea.Cmd {
+func generateCmd(l tile.Layout, src source.Source, o tile.Options) tea.Cmd {
 	return func() tea.Msg {
 		// Honour an edited render DPI for vector sources (raster sources ignore it).
 		if s, ok := src.(source.RenderDPISetter); ok {
@@ -348,7 +348,7 @@ func generateCmd(l tiler.Layout, src source.Source, o tiler.Options) tea.Cmd {
 // generate (valid only when generated is true) so the caller can persist and
 // report them. The alt-screen keeps the form off the scrollback, leaving only
 // the caller's printed summary behind.
-func Run(inputPath string, src source.Source, def tiler.Options) (used tiler.Options, generated bool, err error) {
+func Run(inputPath string, src source.Source, def tile.Options) (used tile.Options, generated bool, err error) {
 	fm, err := tea.NewProgram(New(inputPath, src, def), tea.WithAltScreen()).Run()
 	if err != nil {
 		return def, false, err

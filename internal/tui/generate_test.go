@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"tiler/internal/tiler"
+	"tile/internal/tile"
 )
 
 // fakeDPISource records the DPI it was told to render at, mimicking a vector
@@ -15,11 +15,11 @@ type fakeDPISource struct {
 	setCalls int
 }
 
-func (f *fakeDPISource) Info() tiler.ImageInfo {
-	return tiler.ImageInfo{AspectRatio: 1, IsVector: true}
+func (f *fakeDPISource) Info() tile.ImageInfo {
+	return tile.ImageInfo{AspectRatio: 1, IsVector: true}
 }
 func (f *fakeDPISource) SetRenderDPI(d float64) { f.dpi = d; f.setCalls++ }
-func (f *fakeDPISource) RenderTile(_, _ float64, _ tiler.Rect) (image.Image, error) {
+func (f *fakeDPISource) RenderTile(_, _ float64, _ tile.Rect) (image.Image, error) {
 	img := image.NewRGBA(image.Rect(0, 0, 80, 80))
 	for i := range img.Pix {
 		img.Pix[i] = 0xff
@@ -31,12 +31,12 @@ func (f *fakeDPISource) RenderTile(_, _ float64, _ tiler.Rect) (image.Image, err
 // PDF is generated (previously the source was loaded once and the edit ignored).
 func TestGenerateAppliesEditedDPI(t *testing.T) {
 	src := &fakeDPISource{dpi: 300}
-	o := tiler.DefaultOptions()
+	o := tile.DefaultOptions()
 	o.WidthCM = 20
 	o.RenderDPI = 123
 	o.Output = filepath.Join(t.TempDir(), "out.pdf")
 
-	l, err := tiler.ComputeLayout(o, src.Info())
+	l, err := tile.ComputeLayout(o, src.Info())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestGenerateAppliesEditedDPI(t *testing.T) {
 // submit() must honour the live-edited DPI field end to end.
 func TestSubmitHonoursDPIField(t *testing.T) {
 	src := &fakeDPISource{dpi: 300}
-	def := tiler.DefaultOptions()
+	def := tile.DefaultOptions()
 	def.WidthCM = 20
 	def.Output = filepath.Join(t.TempDir(), "out.pdf")
 	m := New("art.svg", src, def)

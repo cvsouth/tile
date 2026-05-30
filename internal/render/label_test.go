@@ -5,12 +5,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"tiler/internal/tiler"
+	"tile/internal/tile"
 )
 
 type rect struct{ x, y, w, h float64 }
 
-func presentBandRects(b tiler.Bands, pw, ph, ov float64) []rect {
+func presentBandRects(b tile.Bands, pw, ph, ov float64) []rect {
 	var rs []rect
 	if b.Top {
 		rs = append(rs, rect{0, 0, pw, ov})
@@ -40,15 +40,15 @@ func within(inner, outer rect) bool {
 // This is the leak-proofness guarantee: a label confined to the strip is hidden.
 func TestHostStripInsideABandForEveryTile(t *testing.T) {
 	combos := []struct {
-		b tiler.Brushing
-		p tiler.Pasting
+		b tile.Brushing
+		p tile.Pasting
 	}{
-		{tiler.Downwards, tiler.FromLeft},
-		{tiler.Downwards, tiler.FromRight},
-		{tiler.Upwards, tiler.FromLeft},
-		{tiler.Upwards, tiler.FromRight},
+		{tile.Downwards, tile.FromLeft},
+		{tile.Downwards, tile.FromRight},
+		{tile.Upwards, tile.FromLeft},
+		{tile.Upwards, tile.FromRight},
 	}
-	infos := []tiler.ImageInfo{
+	infos := []tile.ImageInfo{
 		{AspectRatio: 0.6, PixelWidth: 5000, PixelHeight: 3000},
 		{AspectRatio: 3.0, PixelWidth: 3000, PixelHeight: 9000},
 		{AspectRatio: 0.05, PixelWidth: 9000, PixelHeight: 450},
@@ -56,9 +56,9 @@ func TestHostStripInsideABandForEveryTile(t *testing.T) {
 	}
 	for _, combo := range combos {
 		for _, info := range infos {
-			o := tiler.DefaultOptions()
+			o := tile.DefaultOptions()
 			o.Brushing, o.Pasting = combo.b, combo.p
-			l, err := tiler.ComputeLayout(o, info)
+			l, err := tile.ComputeLayout(o, info)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -98,9 +98,9 @@ func TestGenerateProducesPDF(t *testing.T) {
 	dir := t.TempDir()
 	// 100mm wide poster, square-ish, default A4 => a few tiles.
 	src := fakeSource{aspect: 0.7, w: 1200, h: 840}
-	o := tiler.DefaultOptions()
+	o := tile.DefaultOptions()
 	o.WidthCM = 60
-	l, err := tiler.ComputeLayout(o, src.Info())
+	l, err := tile.ComputeLayout(o, src.Info())
 	if err != nil {
 		t.Fatal(err)
 	}

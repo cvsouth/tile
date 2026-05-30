@@ -6,7 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"tiler/internal/tiler"
+	"tile/internal/tile"
 )
 
 var (
@@ -40,7 +40,7 @@ func (m Model) View() string {
 	}
 
 	var b strings.Builder
-	b.WriteString("\n " + titleStyle.Render("tiler") + dimStyle.Render(" · "+m.inputPath) + "\n\n")
+	b.WriteString("\n " + titleStyle.Render("tile") + dimStyle.Render(" · "+m.inputPath) + "\n\n")
 
 	b.WriteString(m.toggleRow(fPaper, "Paper size", m.paper.String()))
 	b.WriteString(m.textRow(fOverlap, "Glue overlap", "mm"))
@@ -142,7 +142,7 @@ func (m Model) resultName() string {
 
 // dpiText renders the effective print DPI for a raster source, warning when it
 // is low enough that the image will be visibly upscaled.
-func dpiText(l tiler.Layout) string {
+func dpiText(l tile.Layout) string {
 	v := fmt.Sprintf("%.0f", l.EffectiveDPI)
 	if l.EffectiveDPI < 150 {
 		return warnStyle.Render(v + " — low; the image will look soft printed this large")

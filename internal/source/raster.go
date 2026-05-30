@@ -9,7 +9,7 @@ import (
 	"math"
 	"os"
 
-	"tiler/internal/tiler"
+	"tile/internal/tile"
 )
 
 type rasterSource struct {
@@ -36,8 +36,8 @@ func loadRaster(path string) (Source, error) {
 	return &rasterSource{img: img, width: b.Dx(), height: b.Dy()}, nil
 }
 
-func (r *rasterSource) Info() tiler.ImageInfo {
-	return tiler.ImageInfo{
+func (r *rasterSource) Info() tile.ImageInfo {
+	return tile.ImageInfo{
 		AspectRatio: float64(r.height) / float64(r.width),
 		IsVector:    false,
 		PixelWidth:  r.width,
@@ -45,7 +45,7 @@ func (r *rasterSource) Info() tiler.ImageInfo {
 	}
 }
 
-func (r *rasterSource) RenderTile(posterW, _ float64, win tiler.Rect) (image.Image, error) {
+func (r *rasterSource) RenderTile(posterW, _ float64, win tile.Rect) (image.Image, error) {
 	// One source pixel per (posterW / imgW) mm; preserved aspect makes this the
 	// same density on both axes, so no upscaling is introduced by tiling.
 	ppm := float64(r.width) / posterW

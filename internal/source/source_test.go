@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"tiler/internal/tiler"
+	"tile/internal/tile"
 )
 
 // makePNG writes a width x height PNG: left half red, right half blue.
@@ -62,7 +62,7 @@ func TestRasterInfoAndRender(t *testing.T) {
 	}
 
 	// posterW = 100mm => 1 px/mm. Full window 0..100 x 0..80.
-	full, err := src.RenderTile(100, 80, tiler.Rect{X: 0, Y: 0, W: 100, H: 80})
+	full, err := src.RenderTile(100, 80, tile.Rect{X: 0, Y: 0, W: 100, H: 80})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func TestRasterInfoAndRender(t *testing.T) {
 
 	// Window running off the right edge: x 50..150. Left 50px = source blue,
 	// right 50px = beyond image = blank white.
-	off, err := src.RenderTile(100, 80, tiler.Rect{X: 50, Y: 0, W: 100, H: 80})
+	off, err := src.RenderTile(100, 80, tile.Rect{X: 50, Y: 0, W: 100, H: 80})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func TestSVGInfoAndRender(t *testing.T) {
 	}
 
 	// posterW = 100mm, 1px/mm => 100x100 tile. Left half red, right half blank.
-	full, err := src.RenderTile(100, 100, tiler.Rect{X: 0, Y: 0, W: 100, H: 100})
+	full, err := src.RenderTile(100, 100, tile.Rect{X: 0, Y: 0, W: 100, H: 100})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func TestSVGInfoAndRender(t *testing.T) {
 	}
 
 	// Right-half window (x 50..100) maps to the blank right portion.
-	right, err := src.RenderTile(100, 100, tiler.Rect{X: 50, Y: 0, W: 50, H: 100})
+	right, err := src.RenderTile(100, 100, tile.Rect{X: 50, Y: 0, W: 50, H: 100})
 	if err != nil {
 		t.Fatal(err)
 	}

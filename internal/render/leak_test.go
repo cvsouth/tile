@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-pdf/fpdf"
 
-	"tiler/internal/tiler"
+	"tile/internal/tile"
 )
 
 // The faint label's actual ink must never leak past a covered band edge. This
@@ -19,14 +19,14 @@ func TestLabelInkNeverLeaksBand(t *testing.T) {
 
 	type scenario struct {
 		name  string
-		bands tiler.Bands
+		bands tile.Bands
 	}
 	scenarios := []scenario{
-		{"top", tiler.Bands{Top: true}},
-		{"bottom", tiler.Bands{Bottom: true}},
-		{"left", tiler.Bands{Left: true}},
-		{"right", tiler.Bands{Right: true}},
-		{"top+right", tiler.Bands{Top: true, Right: true}},
+		{"top", tile.Bands{Top: true}},
+		{"bottom", tile.Bands{Bottom: true}},
+		{"left", tile.Bands{Left: true}},
+		{"right", tile.Bands{Right: true}},
+		{"top+right", tile.Bands{Top: true, Right: true}},
 	}
 	overlaps := []float64{0.5, 1, 2, 3, 5, 8, 15, 30}
 	labels := []string{"R1C1", "R9C9", "R12C34", "R100C100", "R1000C100"}
@@ -36,7 +36,7 @@ func TestLabelInkNeverLeaksBand(t *testing.T) {
 	for _, sc := range scenarios {
 		for _, ov := range overlaps {
 			margin := math.Min(ov*0.15, 1.0)
-			strip := chooseHostStrip(sc.bands, tiler.Downwards, tiler.FromLeft, paperW, paperH, ov)
+			strip := chooseHostStrip(sc.bands, tile.Downwards, tile.FromLeft, paperW, paperH, ov)
 			// band rectangle for this single-band scenario equals the strip.
 			bx0, by0 := strip.x, strip.y
 			bx1, by1 := strip.x+strip.w, strip.y+strip.h
@@ -61,8 +61,8 @@ func TestLabelInkNeverLeaksBand(t *testing.T) {
 func TestLabelDrawnAtTypicalOverlap(t *testing.T) {
 	pdf := fpdf.New("P", "mm", "A4", "")
 	pdf.AddPage()
-	for _, bands := range []tiler.Bands{{Top: true}, {Right: true}, {Bottom: true}, {Left: true}} {
-		strip := chooseHostStrip(bands, tiler.Downwards, tiler.FromLeft, 297, 210, 15)
+	for _, bands := range []tile.Bands{{Top: true}, {Right: true}, {Bottom: true}, {Left: true}} {
+		strip := chooseHostStrip(bands, tile.Downwards, tile.FromLeft, 297, 210, 15)
 		plan := planLabel(pdf, strip, "R3C4", math.Min(15*0.15, 1.0))
 		if !plan.draw {
 			t.Errorf("label for bands %+v unexpectedly skipped at 15mm overlap", bands)

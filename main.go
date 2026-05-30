@@ -1,9 +1,9 @@
-// Command tiler turns an image into a multi-page, tile-and-glue PDF poster.
+// Command tile turns an image into a multi-page, tile-and-glue PDF poster.
 //
 // Usage:
 //
-//	tiler [options] <image>          # interactive TUI (flags seed the defaults)
-//	tiler --non-interactive [options] <image>
+//	tile [options] <image>          # interactive TUI (flags seed the defaults)
+//	tile --non-interactive [options] <image>
 //
 // The last-used settings are remembered per working directory in a .tile.json
 // file and become the defaults next time, unless overridden by arguments.
@@ -17,17 +17,17 @@ import (
 	"path/filepath"
 	"strings"
 
-	"tiler/internal/render"
-	"tiler/internal/source"
-	"tiler/internal/tiler"
-	"tiler/internal/tui"
+	"tile/internal/render"
+	"tile/internal/source"
+	"tile/internal/tile"
+	"tile/internal/tui"
 )
 
 const settingsFile = ".tile.json"
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, "tiler: "+err.Error())
+		fmt.Fprintln(os.Stderr, "tile: "+err.Error())
 		os.Exit(1)
 	}
 }
@@ -35,14 +35,14 @@ func main() {
 func run(args []string) error {
 	cwd, _ := os.Getwd()
 	// Built-in defaults, overlaid with any remembered settings for this directory.
-	base := loadDefaults(tiler.DefaultOptions(), cwd)
+	base := loadDefaults(tile.DefaultOptions(), cwd)
 
-	fs := flag.NewFlagSet("tiler", flag.ContinueOnError)
+	fs := flag.NewFlagSet("tile", flag.ContinueOnError)
 	fs.Usage = func() {
-		const usage = `tiler — image tiler for multi-page tile-and-glue prints
+		const usage = `tile — image tile for multi-page tile-and-glue prints
 
 Usage:
-  tiler [options] <image.(jpg|jpeg|png|svg)>
+  tile [options] <image.(jpg|jpeg|png|svg)>
 
 With no --non-interactive flag the options below just seed the TUI defaults.
 Settings are remembered per directory in ` + settingsFile + ` and reused next time.
@@ -80,16 +80,16 @@ Options:
 
 	o := base
 	var err error
-	if o.Paper, err = tiler.ParsePaper(*paper); err != nil {
+	if o.Paper, err = tile.ParsePaper(*paper); err != nil {
 		return err
 	}
-	if o.Brushing, err = tiler.ParseBrushing(*brushing); err != nil {
+	if o.Brushing, err = tile.ParseBrushing(*brushing); err != nil {
 		return err
 	}
-	if o.Pasting, err = tiler.ParsePasting(*pasting); err != nil {
+	if o.Pasting, err = tile.ParsePasting(*pasting); err != nil {
 		return err
 	}
-	if o.Labels, err = tiler.ParseToggle(*labels); err != nil {
+	if o.Labels, err = tile.ParseToggle(*labels); err != nil {
 		return err
 	}
 	o.OverlapMM = *overlap
@@ -115,9 +115,9 @@ Options:
 
 	if *nonInteractive {
 		if o.Output == "" {
-			o.Output = tiler.DefaultOutputName(imagePath)
+			o.Output = tile.DefaultOutputName(imagePath)
 		}
-		layout, err := tiler.ComputeLayout(o, src.Info())
+		layout, err := tile.ComputeLayout(o, src.Info())
 		if err != nil {
 			return err
 		}
@@ -137,13 +137,13 @@ Options:
 
 	// Persist the used settings as this directory's defaults, and print them so
 	// the run stays in the terminal history for reference.
-	layout, err := tiler.ComputeLayout(o, src.Info())
+	layout, err := tile.ComputeLayout(o, src.Info())
 	if err != nil {
 		return err
 	}
 	saved := ""
 	if path, serr := saveDefaults(cwd, o); serr != nil {
-		fmt.Fprintf(os.Stderr, "tiler: could not save %s: %v\n", settingsFile, serr)
+		fmt.Fprintf(os.Stderr, "tile: could not save %s: %v\n", settingsFile, serr)
 	} else {
 		saved = path
 	}
@@ -152,7 +152,7 @@ Options:
 }
 
 // printRun reports the result and the exact settings used (as reusable flags).
-func printRun(o tiler.Options, l tiler.Layout, savedPath string) {
+func printRun(o tile.Options, l tile.Layout, savedPath string) {
 	fmt.Printf("Wrote %d pages (%d cols × %d rows, %s %s) to %s\n",
 		l.TotalPages(), l.Cols, l.Rows, o.Paper, l.Orientation, o.Output)
 	fmt.Printf("Settings: %s\n", settingsArgs(o, l.IsVector))
@@ -169,7 +169,7 @@ func printRun(o tiler.Options, l tiler.Layout, savedPath string) {
 }
 
 // settingsArgs renders the options as a command line that reproduces the run.
-func settingsArgs(o tiler.Options, isVector bool) string {
+func settingsArgs(o tile.Options, isVector bool) string {
 	parts := []string{
 		"--paper " + o.Paper.String(),
 		fmt.Sprintf("--overlap %g", o.OverlapMM),
@@ -199,7 +199,7 @@ type persisted struct {
 
 // loadDefaults overlays any settings stored in dir's .tile.json onto base. A
 // missing file is silently ignored; a malformed one is reported but ignored.
-func loadDefaults(base tiler.Options, dir string) tiler.Options {
+func loadDefaults(base tile.Options, dir string) tile.Options {
 	if dir == "" {
 		return base
 	}
@@ -209,17 +209,17 @@ func loadDefaults(base tiler.Options, dir string) tiler.Options {
 	}
 	var p persisted
 	if err := json.Unmarshal(data, &p); err != nil {
-		fmt.Fprintf(os.Stderr, "tiler: ignoring malformed %s: %v\n", settingsFile, err)
+		fmt.Fprintf(os.Stderr, "tile: ignoring malformed %s: %v\n", settingsFile, err)
 		return base
 	}
 	o := base
-	if v, err := tiler.ParsePaper(p.Paper); err == nil {
+	if v, err := tile.ParsePaper(p.Paper); err == nil {
 		o.Paper = v
 	}
-	if v, err := tiler.ParseBrushing(p.Brushing); err == nil {
+	if v, err := tile.ParseBrushing(p.Brushing); err == nil {
 		o.Brushing = v
 	}
-	if v, err := tiler.ParsePasting(p.Pasting); err == nil {
+	if v, err := tile.ParsePasting(p.Pasting); err == nil {
 		o.Pasting = v
 	}
 	if p.OverlapMM > 0 {
@@ -238,7 +238,7 @@ func loadDefaults(base tiler.Options, dir string) tiler.Options {
 }
 
 // saveDefaults writes the used settings to dir's .tile.json and returns its path.
-func saveDefaults(dir string, o tiler.Options) (string, error) {
+func saveDefaults(dir string, o tile.Options) (string, error) {
 	if dir == "" {
 		return "", fmt.Errorf("no working directory")
 	}
@@ -269,15 +269,15 @@ func onOff(b bool) string {
 	return "off"
 }
 
-func brushingFlag(b tiler.Brushing) string {
-	if b == tiler.Upwards {
+func brushingFlag(b tile.Brushing) string {
+	if b == tile.Upwards {
 		return "up"
 	}
 	return "down"
 }
 
-func pastingFlag(p tiler.Pasting) string {
-	if p == tiler.FromRight {
+func pastingFlag(p tile.Pasting) string {
+	if p == tile.FromRight {
 		return "from-right"
 	}
 	return "from-left"

@@ -9,7 +9,7 @@ import (
 	"github.com/srwiley/oksvg"
 	"github.com/srwiley/rasterx"
 
-	"tiler/internal/tiler"
+	"tile/internal/tile"
 )
 
 type svgSource struct {
@@ -43,8 +43,8 @@ func loadSVG(path string, renderDPI float64) (Source, error) {
 	}, nil
 }
 
-func (s *svgSource) Info() tiler.ImageInfo {
-	return tiler.ImageInfo{
+func (s *svgSource) Info() tile.ImageInfo {
+	return tile.ImageInfo{
 		AspectRatio: s.vbH / s.vbW,
 		IsVector:    true,
 	}
@@ -56,7 +56,7 @@ func (s *svgSource) SetRenderDPI(dpi float64) { s.renderDPI = dpi }
 
 // RenderTile is not safe for concurrent use: it sets the transform on the shared
 // parsed icon. The PDF renderer calls it serially.
-func (s *svgSource) RenderTile(posterW, _ float64, win tiler.Rect) (image.Image, error) {
+func (s *svgSource) RenderTile(posterW, _ float64, win tile.Rect) (image.Image, error) {
 	// Rasterise at the requested DPI measured against the final poster scale, so
 	// the effective print DPI genuinely equals the render DPI.
 	ppm := s.renderDPI / 25.4

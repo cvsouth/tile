@@ -1,4 +1,4 @@
-# tiler
+# Tile
 
 Turn any image into a multi-page, tile-and-glue PDF poster. Print every page,
 glue them on their overlaps, and you get one large reproduction of the original.
@@ -9,7 +9,7 @@ neighbouring tiles overlap by the glue overlap.
 ## Build
 
 ```sh
-go build -o tiler .
+go build -o tile .
 ```
 
 ## Use
@@ -17,13 +17,13 @@ go build -o tiler .
 Interactive (a TUI to tweak options and see the page plan before generating):
 
 ```sh
-./tiler path/to/image.png
+./tile path/to/image.png
 ```
 
 Non-interactive (generate straight away):
 
 ```sh
-./tiler --non-interactive --width 150 --paper A3 path/to/image.svg
+./tile --non-interactive --width 150 --paper A3 path/to/image.svg
 ```
 
 Accepted inputs: **JPG, PNG, SVG**. Without `--non-interactive`, the flags below
@@ -48,11 +48,11 @@ was last used in the current directory (see below). Any flag still overrides.
 
 ## Remembered settings
 
-After each successful run, tiler writes the settings it used to a `.tile.json`
+After each successful run, tile writes the settings it used to a `.tile.json`
 file in the current working directory. The next time it runs from that directory
 those become the defaults — so each project folder keeps its own preferences.
 Command-line flags (and edits in the TUI) always override, and the file is
-human-readable if you want to tweak it by hand. On finishing, tiler prints the
+human-readable if you want to tweak it by hand. On finishing, tile prints the
 exact settings used as a reusable command line, so the run stays in your shell
 history for reference.
 

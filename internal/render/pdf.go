@@ -9,15 +9,15 @@ import (
 
 	"github.com/go-pdf/fpdf"
 
-	"tiler/internal/source"
-	"tiler/internal/tiler"
+	"tile/internal/source"
+	"tile/internal/tile"
 )
 
 // Generate writes the tiled PDF for layout l to outPath, rendering each tile on
 // demand from src. Every page is full paper size (borderless); the image is
 // placed edge to edge and, when enabled, a faint alignment label and guide are
 // drawn inside the hidden overlap band.
-func Generate(l tiler.Layout, src source.Source, o tiler.Options, outPath string) error {
+func Generate(l tile.Layout, src source.Source, o tile.Options, outPath string) error {
 	pdf := fpdf.NewCustom(&fpdf.InitType{
 		UnitStr: "mm",
 		Size:    fpdf.SizeType{Wd: l.PaperW, Ht: l.PaperH},

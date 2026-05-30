@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-pdf/fpdf"
 
-	"tiler/internal/tiler"
+	"tile/internal/tile"
 )
 
 const minLabelPt = 3.0 // below this the label is illegibly small; skip it rather than leak
@@ -15,9 +15,8 @@ const minLabelPt = 3.0 // below this the label is illegibly small; skip it rathe
 // are kept faint; the black+white construction keeps them readable on any
 // background even at low opacity.
 const (
-	guideAlpha       = 0.3  // alternating white/black dashed seam guides
-	labelAlpha       = 0.6  // label on a covered (hidden) band
-	cornerLabelAlpha = 0.35 // the one tile with no band: its label may show, so fainter
+	guideAlpha = 0.12 // alternating white/black dashed seam guides — kept very subtle
+	labelAlpha = 0.4  // label on a covered (hidden) band
 )
 
 // hostStrip is the rectangle (page mm) a tile's label is drawn inside. It is
@@ -34,7 +33,7 @@ type hostStrip struct {
 // tile has no band (the one outer-corner tile), the label is placed in the
 // poster's outer corner, derived from the brushing/pasting directions, and
 // marked uncovered so the caller can draw it extra faintly.
-func chooseHostStrip(b tiler.Bands, brush tiler.Brushing, paste tiler.Pasting, paperW, paperH, overlap float64) hostStrip {
+func chooseHostStrip(b tile.Bands, brush tile.Brushing, paste tile.Pasting, paperW, paperH, overlap float64) hostStrip {
 	switch {
 	case b.Top:
 		return hostStrip{x: 0, y: 0, w: paperW, h: overlap, covered: true}
@@ -46,11 +45,11 @@ func chooseHostStrip(b tiler.Bands, brush tiler.Brushing, paste tiler.Pasting, p
 		return hostStrip{x: 0, y: 0, w: overlap, h: paperH, covered: true, vertical: true}
 	default:
 		y := 0.0
-		if brush == tiler.Upwards {
+		if brush == tile.Upwards {
 			y = paperH - overlap
 		}
 		x := paperW - overlap // from-left => right edge is the home side
-		if paste == tiler.FromRight {
+		if paste == tile.FromRight {
 			x = 0
 		}
 		return hostStrip{x: x, y: y, w: overlap, h: overlap, covered: false}
@@ -137,7 +136,7 @@ func labelGeometry(s hostStrip, p labelPlan) labelGeom {
 // drawLabel draws the alignment label (a white copy beside a black copy, so it
 // reads on any background) and the seam guide lines, all inside the hidden
 // overlap band(s).
-func drawLabel(pdf *fpdf.Fpdf, l tiler.Layout, o tiler.Options, tile tiler.Tile) {
+func drawLabel(pdf *fpdf.Fpdf, l tile.Layout, o tile.Options, tile tile.Tile) {
 	overlap := l.Overlap
 	margin := math.Min(overlap*0.15, 1.0)
 
@@ -147,18 +146,18 @@ func drawLabel(pdf *fpdf.Fpdf, l tiler.Layout, o tiler.Options, tile tiler.Tile)
 	drawGuides(pdf, l, tile.Bands, math.Max(0.15, overlap*0.02))
 
 	strip := chooseHostStrip(tile.Bands, o.Brushing, o.Pasting, l.PaperW, l.PaperH, overlap)
+	if !strip.covered {
+		// This tile has no band — nowhere it will be overlapped by a neighbour —
+		// so a label here could never be hidden. Don't print one at all.
+		return
+	}
 	label := fmt.Sprintf("R%dC%d", tile.Row+1, tile.Col+1)
 	plan := planLabel(pdf, strip, label, margin)
 	if !plan.draw {
-		pdf.SetAlpha(1, "Normal")
 		return
 	}
 
-	alpha := labelAlpha
-	if !strip.covered {
-		alpha = cornerLabelAlpha // the one unavoidably-visible corner: a touch softer
-	}
-	pdf.SetAlpha(alpha, "Normal")
+	pdf.SetAlpha(labelAlpha, "Normal")
 	pdf.SetFont("Helvetica", "", plan.fontPt)
 
 	g := labelGeometry(strip, plan)
@@ -181,7 +180,7 @@ func drawTwoTone(pdf *fpdf.Fpdf, whiteX, blackX, baseline float64, label string)
 	pdf.Text(blackX, baseline, label)
 }
 
-func drawGuides(pdf *fpdf.Fpdf, l tiler.Layout, b tiler.Bands, lineW float64) {
+func drawGuides(pdf *fpdf.Fpdf, l tile.Layout, b tile.Bands, lineW float64) {
 	if b.Top {
 		drawAltLine(pdf, 0, l.Overlap, l.PaperW, l.Overlap, lineW)
 	}

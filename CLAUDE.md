@@ -1,4 +1,4 @@
-# Tiler
+# Tile
 
 Image tiler for multi-page prints.
 
@@ -51,7 +51,7 @@ The program accept the following file types:
 
 ### Technology
 
-Write this program in Golang with Bubbletea. The program should be started using `./tiler <relative or path to image>`
+Write this program in Golang with Bubbletea. The program should be started using `./tile <relative or path to image>`
 
 The program should also be able to be run non-interactively by passing all the options as arguments plus --non-interactive. Passing arguments without the --non-interactive just changes the defaults for that run.
 

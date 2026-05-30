@@ -9,18 +9,18 @@ import (
 	"path/filepath"
 	"strings"
 
-	"tiler/internal/tiler"
+	"tile/internal/tile"
 )
 
 // Source is a loaded image that can render any poster-space window.
 type Source interface {
 	// Info reports the pure metadata the core needs (aspect ratio, vector flag,
 	// intrinsic pixel size for raster sources).
-	Info() tiler.ImageInfo
+	Info() tile.ImageInfo
 	// RenderTile renders the poster-space window win (millimetres) into a fresh
 	// bitmap. posterW/posterH are the full printed poster size in millimetres.
 	// Any part of the window beyond the image is left blank (white).
-	RenderTile(posterW, posterH float64, win tiler.Rect) (image.Image, error)
+	RenderTile(posterW, posterH float64, win tile.Rect) (image.Image, error)
 }
 
 // RenderDPISetter is implemented by sources whose rasterisation DPI can change

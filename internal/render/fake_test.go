@@ -4,7 +4,7 @@ import (
 	"image"
 	"image/color"
 
-	"tiler/internal/tiler"
+	"tile/internal/tile"
 )
 
 // fakeSource is an in-memory source for renderer tests (no file I/O).
@@ -13,11 +13,11 @@ type fakeSource struct {
 	w, h   int
 }
 
-func (f fakeSource) Info() tiler.ImageInfo {
-	return tiler.ImageInfo{AspectRatio: f.aspect, PixelWidth: f.w, PixelHeight: f.h}
+func (f fakeSource) Info() tile.ImageInfo {
+	return tile.ImageInfo{AspectRatio: f.aspect, PixelWidth: f.w, PixelHeight: f.h}
 }
 
-func (f fakeSource) RenderTile(_, _ float64, win tiler.Rect) (image.Image, error) {
+func (f fakeSource) RenderTile(_, _ float64, win tile.Rect) (image.Image, error) {
 	// Small constant-size bitmap with a recognisable colour so the PDF is real.
 	img := image.NewRGBA(image.Rect(0, 0, 120, 90))
 	for y := 0; y < 90; y++ {

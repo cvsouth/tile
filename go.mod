@@ -1,4 +1,4 @@
-module tiler
+module tile
 
 go 1.26.3
 

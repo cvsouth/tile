@@ -1,7 +1,7 @@
-// Package tiler holds the pure domain logic for laying out an image across
+// Package tile holds the pure domain logic for laying out an image across
 // multiple printed pages. It performs no I/O: callers supply image metadata
 // and receive a Layout describing every tile.
-package tiler
+package tile
 
 import "fmt"
 
