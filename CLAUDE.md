@@ -2,13 +2,31 @@
 
 Image tiler for multi-page prints.
 
-# Product
+## Product
 
 The purpose of this program is to produce a TUI to be able to take any image from the local computer and then provide a series of options for the user to configure and then submit, at which point the program generates a PDF file with a series of pages such that if the user prints all the pages, the user would then be able to tile the pages together, gluing them on their overlap, to create one large production of the original image. Assume borderless printing.
 
-The way the tiles will be put together is by first sticking together all the columns in vertical strips. This is so they can be pasted like wallpaper rolls. This also means that depending on which direction they are going to be brushed, depends which side top or bottom of the vertical overlap should be ok, to avoid snaring the brush. If they are going to be pasted top to bottom then they should have the overlap on the top edge (with the exception of the top piece of each column which would not include an overlap), and inversely if they are going to be brushed from bottom to top then they should have the overlap on the bottom edge (with the exception of the bottom piece of each column which would not include an overlap). Overlaps should not be blank but should have the repeat of what is going to be glued on top of them on them, to minimise any gaps if the overlap gluing is not perfect.
+The program should optimize for the minimum number of vertical columns, most commonly this will be by making the tiles landscape. There is probably just a few cases where portrait tiles would be more optimal.
 
-Once the vertical strips / columns have been prepared then they can be pasted either from left to right or right to left, which determines which edge the left/right overlap is on. For left to right the overlap would be on the right hand edge with the exception of the right most column, and for right to left the overlap would be on the left hand side with the exception of the left most column. Again, Overlaps should not be blank but should have the repeat of what is going to be glued on top of them on them, to minimise any gaps if the overlap gluing is not perfect.
+### Overlap model
+
+Every piece overlaps its neighbours by the glue overlap. At each seam one piece sits on top; the piece underneath carries an *overlap band* — a strip, as wide or tall as the overlap, that repeats the image content the top piece will cover. So if a glue-up is slightly misaligned and a sliver of the lower piece peeks out, it still shows the correct image and there is no blank gap. The band always sits on the covered edge, so once assembled it is hidden.
+
+The columns are assembled into vertical strips first (so they can be pasted like wallpaper rolls), then the strips are pasted side by side. Which piece sits on top is chosen so the brush never meets a raised edge.
+
+Vertical seams (within a column) are set by the brushing direction:
+
+- **Downwards (default):** the upper piece sits on top, and the lower piece's overlap band is on its **top** edge (hidden underneath). Brushing downwards, the brush rides off the upper piece downhill onto the lower one, so it never snags. The **top** piece of each column has no band.
+- **Upwards:** the mirror image — the lower piece sits on top, the band is on the **bottom** edge, and the **bottom** piece of each column has no band.
+
+Horizontal seams (between finished strips) are set by the pasting order:
+
+- **From left (default):** each column is laid on top of the column to its left, so the band is on each column's **right** edge (hidden under the next strip). The **rightmost** column has no band.
+- **From right:** the mirror image — the band is on each column's **left** edge, and the **leftmost** column has no band.
+
+Layout: every page is full paper size (borderless). The effective step between pieces is `paper-dimension − overlap`, so `columns = ceil((width − overlap) / (paperWidth − overlap))` and `rows = ceil((height − overlap) / (paperHeight − overlap))` for the chosen tile orientation. The last row/column simply runs off the image; the leftover page area is left blank.
+
+### Inputs
 
 The configurable options are:
 
@@ -17,9 +35,13 @@ The configurable options are:
 - Width (in centimetres; default: 123cm)
 - Brushing direction (upwards or downwards; default: downwards)
 - Pasting order (from left or from right; default: from left)
-- Output filename (default: <original file name>.tiles.pdf)
+- Render DPI for vector (SVG) sources (default: 300)
+- Faint alignment labels (on or off; default: on) — prints each tile's label and a placement guide inside the overlap band, so they are hidden once the tiles are assembled
+- Output filename (default: <original file name>.tiles.pdf, with the original extension stripped)
 
-Height is always automatic based on width and a preserved image aspect ratio
+Height is always automatic based on width and a preserved image aspect ratio.
+
+The effective print DPI for the current options is shown before submitting, so the user can tell whether a raster source is being scaled up too far.
 
 The program accept the following file types:
 
@@ -27,9 +49,7 @@ The program accept the following file types:
 - PNG
 - SVG
 
-The program should optimize for the minimum number of vertical columns, most commonly this will be by making the tiles landscape. There is probably just a few cases where portrait tiles would be more optimal.
-
-# Technology
+### Technology
 
 Write this program in Golang with Bubbletea. The program should be started using `./tiler <relative or path to image>`
 
